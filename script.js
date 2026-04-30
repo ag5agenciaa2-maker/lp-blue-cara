@@ -44,6 +44,10 @@ class Navigation {
         this.navToggle = $('#navToggle');
         this.navMenu = $('#navMenu');
         this.navLinks = $$('.nav-link');
+        this.drawer = $('#drawerMenu');
+        this.drawerOverlay = $('#drawerOverlay');
+        this.drawerClose = $('#drawerClose');
+        this.drawerLinks = $$('.drawer-link');
 
         this.init();
     }
@@ -57,57 +61,88 @@ class Navigation {
 
     handleScroll() {
         let lastScroll = 0;
+        let rafPending = false;
 
-        window.addEventListener('scroll', throttle(() => {
-            const currentScroll = window.pageYOffset;
+        window.addEventListener('scroll', () => {
+            if (rafPending) return;
+            rafPending = true;
+            requestAnimationFrame(() => {
+                rafPending = false;
+                const currentScroll = window.pageYOffset;
 
-            // Adiciona classe quando scrolla
-            if (currentScroll > 50) {
-                this.header.classList.add('scrolled');
-            } else {
-                this.header.classList.remove('scrolled');
-            }
+                // Adiciona classe quando scrolla
+                if (currentScroll > 50) {
+                    this.header.classList.add('scrolled');
+                } else {
+                    this.header.classList.remove('scrolled');
+                }
 
-            lastScroll = currentScroll;
-        }, 100));
+                // Ao descer some, ao subir aparece
+                if (currentScroll > lastScroll && currentScroll > 200) {
+                    // Rolando para baixo
+                    this.header.classList.add('header-hidden');
+                } else {
+                    // Rolando para cima
+                    this.header.classList.remove('header-hidden');
+                }
+
+                lastScroll = currentScroll <= 0 ? 0 : currentScroll;
+            });
+        }, { passive: true });
     }
 
     handleMobileMenu() {
-        if (!this.navToggle) return;
+        if (!this.navToggle || !this.drawer) return;
+
+        const openDrawer = () => {
+            this.drawer.classList.add('active');
+            this.drawerOverlay.classList.add('active');
+            this.navToggle.setAttribute('aria-expanded', 'true');
+            this.navToggle.classList.add('active');
+            document.body.classList.add('no-scroll');
+        };
+
+        const closeDrawer = () => {
+            this.drawer.classList.remove('active');
+            this.drawerOverlay.classList.remove('active');
+            this.navToggle.setAttribute('aria-expanded', 'false');
+            this.navToggle.classList.remove('active');
+            document.body.classList.remove('no-scroll');
+        };
 
         this.navToggle.addEventListener('click', () => {
-            const isExpanded = this.navToggle.getAttribute('aria-expanded') === 'true';
-            this.navToggle.setAttribute('aria-expanded', !isExpanded);
-            this.navToggle.classList.toggle('active');
-            this.navMenu.classList.toggle('active');
-
-            // Previne scroll do body quando menu está aberto
-            document.body.style.overflow = isExpanded ? '' : 'hidden';
+            const isOpen = this.drawer.classList.contains('active');
+            if (isOpen) {
+                closeDrawer();
+            } else {
+                openDrawer();
+            }
         });
 
-        // Fecha menu ao clicar em um link
-        this.navLinks.forEach(link => {
-            link.addEventListener('click', () => {
-                this.navToggle.setAttribute('aria-expanded', 'false');
-                this.navToggle.classList.remove('active');
-                this.navMenu.classList.remove('active');
-                document.body.style.overflow = '';
-            });
+        if (this.drawerClose) {
+            this.drawerClose.addEventListener('click', closeDrawer);
+        }
+
+        if (this.drawerOverlay) {
+            this.drawerOverlay.addEventListener('click', closeDrawer);
+        }
+
+        // Fecha menu ao clicar em um link do drawer
+        this.drawerLinks.forEach(link => {
+            link.addEventListener('click', closeDrawer);
         });
 
-        // Fecha menu ao clicar fora
-        document.addEventListener('click', (e) => {
-            if (!this.header.contains(e.target) && this.navMenu.classList.contains('active')) {
-                this.navToggle.setAttribute('aria-expanded', 'false');
-                this.navToggle.classList.remove('active');
-                this.navMenu.classList.remove('active');
-                document.body.style.overflow = '';
+        // Fechar com a tecla Esc
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.drawer.classList.contains('active')) {
+                closeDrawer();
             }
         });
     }
 
     handleSmoothScroll() {
-        this.navLinks.forEach(link => {
+        const allLinks = [...this.navLinks, ...this.drawerLinks];
+        allLinks.forEach(link => {
             link.addEventListener('click', (e) => {
                 const href = link.getAttribute('href');
                 if (href.startsWith('#')) {
@@ -129,25 +164,31 @@ class Navigation {
 
     handleActiveLink() {
         const sections = $$('section[id]');
+        let rafPending = false;
 
-        window.addEventListener('scroll', throttle(() => {
-            const scrollPosition = window.pageYOffset + this.header.offsetHeight + 100;
+        window.addEventListener('scroll', () => {
+            if (rafPending) return;
+            rafPending = true;
+            requestAnimationFrame(() => {
+                rafPending = false;
+                const scrollPosition = window.pageYOffset + this.header.offsetHeight + 100;
 
-            sections.forEach(section => {
-                const sectionTop = section.offsetTop;
-                const sectionHeight = section.offsetHeight;
-                const sectionId = section.getAttribute('id');
+                sections.forEach(section => {
+                    const sectionTop = section.offsetTop;
+                    const sectionHeight = section.offsetHeight;
+                    const sectionId = section.getAttribute('id');
 
-                if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
-                    this.navLinks.forEach(link => {
-                        link.classList.remove('active');
-                        if (link.getAttribute('href') === `#${sectionId}`) {
-                            link.classList.add('active');
-                        }
-                    });
-                }
+                    if (scrollPosition >= sectionTop && scrollPosition < sectionTop + sectionHeight) {
+                        this.navLinks.forEach(link => {
+                            link.classList.remove('active');
+                            if (link.getAttribute('href') === `#${sectionId}`) {
+                                link.classList.add('active');
+                            }
+                        });
+                    }
+                });
             });
-        }, 100));
+        }, { passive: true });
     }
 }
 
@@ -195,10 +236,10 @@ class ScrollReveal {
     }
 
     init() {
-        // Adiciona classe reveal aos elementos
+        // Adiciona classe reveal aos elementos (delay via CSS, não inline)
         this.elements.forEach((el, index) => {
             el.classList.add('reveal');
-            el.style.transitionDelay = `${index * 0.05}s`;
+            el.style.setProperty('--reveal-delay', `${index * 0.02}s`);
         });
 
         // Observer para animar quando entrar na viewport
@@ -210,8 +251,8 @@ class ScrollReveal {
                 }
             });
         }, {
-            threshold: 0.1,
-            rootMargin: '0px 0px -50px 0px'
+            threshold: 0.05,
+            rootMargin: '0px 0px 100px 0px'
         });
 
         this.elements.forEach(el => observer.observe(el));
@@ -393,10 +434,12 @@ class ContactForm {
             // Redireciona para WhatsApp após 1.5s
             setTimeout(() => {
                 const nome = $('#nome').value;
+                const email = $('#email').value || 'Não informado';
                 const telefone = $('#telefone').value;
-                const servico = $('#servico').value;
+                const servico = $('#servico').options[$('#servico').selectedIndex].text;
+                const mensagem = $('#mensagem').value || 'Não informada';
 
-                const message = `Olá! Sou ${nome} e gostaria de solicitar um orçamento para ${servico}. Meu telefone é ${telefone}.`;
+                const message = `Olá, me chamo ${nome}, vim através do site e gostaria de uma informação.\n\n- E-mail: ${email}\n- Telefone: ${telefone}\n- Serviço: ${servico}\n- Situação: ${mensagem}`;
                 const whatsappUrl = `https://wa.me/5521982873540?text=${encodeURIComponent(message)}`;
 
                 window.open(whatsappUrl, '_blank');
@@ -476,161 +519,6 @@ class LazyLoader {
 }
 
 // ============================================
-// CURSOR PERSONALIZADO (DESKTOP ONLY)
-// ============================================
-
-class CustomCursor {
-    constructor() {
-        this.cursor = null;
-        this.cursorDot = null;
-        this.init();
-    }
-
-    init() {
-        // Apenas em desktop
-        if (window.matchMedia('(pointer: coarse)').matches) return;
-        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-        this.createCursor();
-        this.addEventListeners();
-    }
-
-    createCursor() {
-        this.cursor = document.createElement('div');
-        this.cursor.className = 'custom-cursor';
-        this.cursor.style.cssText = `
-            position: fixed;
-            width: 40px;
-            height: 40px;
-            border: 2px solid var(--color-primary);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 9999;
-            transition: transform 0.1s ease, opacity 0.3s ease;
-            opacity: 0;
-            mix-blend-mode: difference;
-        `;
-
-        this.cursorDot = document.createElement('div');
-        this.cursorDot.className = 'custom-cursor-dot';
-        this.cursorDot.style.cssText = `
-            position: fixed;
-            width: 8px;
-            height: 8px;
-            background: var(--color-primary);
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 9999;
-            opacity: 0;
-        `;
-
-        document.body.appendChild(this.cursor);
-        document.body.appendChild(this.cursorDot);
-    }
-
-    addEventListeners() {
-        let mouseX = 0, mouseY = 0;
-        let cursorX = 0, cursorY = 0;
-
-        document.addEventListener('mousemove', (e) => {
-            mouseX = e.clientX;
-            mouseY = e.clientY;
-
-            this.cursorDot.style.opacity = '1';
-            this.cursor.style.opacity = '0.5';
-            this.cursorDot.style.left = `${mouseX - 4}px`;
-            this.cursorDot.style.top = `${mouseY - 4}px`;
-        });
-
-        // Animação suave do cursor
-        const animate = () => {
-            cursorX += (mouseX - cursorX) * 0.1;
-            cursorY += (mouseY - cursorY) * 0.1;
-
-            this.cursor.style.left = `${cursorX - 20}px`;
-            this.cursor.style.top = `${cursorY - 20}px`;
-
-            requestAnimationFrame(animate);
-        };
-        animate();
-
-        // Efeito hover em links e botões
-        const interactiveElements = $$('a, button, .service-card, .diff-card, .testimonial-card');
-        interactiveElements.forEach(el => {
-            el.addEventListener('mouseenter', () => {
-                this.cursor.style.transform = 'scale(1.5)';
-                this.cursor.style.borderColor = 'var(--color-accent)';
-            });
-            el.addEventListener('mouseleave', () => {
-                this.cursor.style.transform = 'scale(1)';
-                this.cursor.style.borderColor = 'var(--color-primary)';
-            });
-        });
-
-        // Esconde cursor ao sair da janela
-        document.addEventListener('mouseleave', () => {
-            this.cursor.style.opacity = '0';
-            this.cursorDot.style.opacity = '0';
-        });
-
-        document.addEventListener('mouseenter', () => {
-            this.cursor.style.opacity = '0.5';
-            this.cursorDot.style.opacity = '1';
-        });
-    }
-}
-
-// ============================================
-// NOTIFICAÇÃO TOAST
-// ============================================
-
-class ToastNotification {
-    constructor() {
-        this.container = null;
-        this.init();
-    }
-
-    init() {
-        this.container = document.createElement('div');
-        this.container.className = 'toast-container';
-        this.container.style.cssText = `
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 9999;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        `;
-        document.body.appendChild(this.container);
-    }
-
-    show(message, type = 'success', duration = 3000) {
-        const toast = document.createElement('div');
-        toast.className = `toast toast-${type}`;
-        toast.style.cssText = `
-            background: ${type === 'success' ? 'var(--color-success)' : type === 'error' ? 'var(--color-error)' : 'var(--color-primary)'};
-            color: white;
-            padding: 12px 24px;
-            border-radius: var(--radius-lg);
-            font-size: var(--text-sm);
-            font-weight: 500;
-            box-shadow: var(--shadow-lg);
-            animation: slideUp 0.3s ease;
-        `;
-        toast.textContent = message;
-
-        this.container.appendChild(toast);
-
-        setTimeout(() => {
-            toast.style.animation = 'slideDown 0.3s ease';
-            setTimeout(() => toast.remove(), 300);
-        }, duration);
-    }
-}
-
-// ============================================
 // INICIALIZAÇÃO
 // ============================================
 
@@ -644,120 +532,11 @@ document.addEventListener('DOMContentLoaded', () => {
     new ParallaxEffect();
     new LazyLoader();
 
-    // Toast global
-    window.toast = new ToastNotification();
-
-    // Gerenciamento de Áudio
-    new AudioManager();
-
     // Adiciona classe ao body quando JS carrega
     document.body.classList.add('js-loaded');
 
     console.log('🩺 Blue Care - Site carregado com sucesso!');
 });
-
-// ============================================
-// GERENCIAMENTO DE ÁUDIO
-// ============================================
-
-class AudioManager {
-    constructor() {
-        this.voiceSrc = 'ElevenLabs_2026-03-07T01_35_03_Rachel_pre_sp100_s50_sb75_se0_b_m2.mp3';
-        this.bgMusicSrc = 'alex-productions-upbeat-and-inspiring-corporate-web(chosic.com).mp3';
-
-        this.voiceAudio = new Audio(this.voiceSrc);
-        this.bgMusic = new Audio(this.bgMusicSrc);
-
-        this.initialized = false;
-        this.isPaused = false;
-        this.controlBtn = $('#audioControl');
-
-        this.init();
-    }
-
-    init() {
-        // Configurações da música de fundo
-        this.bgMusic.loop = true;
-        this.bgMusic.volume = 0.15; // Volume baixo para compor o fundo
-
-        // Configurações da voz
-        this.voiceAudio.volume = 0.8;
-
-        // Gerencia botão de controle
-        if (this.controlBtn) {
-            this.controlBtn.addEventListener('click', () => this.toggleAudio());
-        }
-
-        // Tenta tocar ao carregar (geralmente bloqueado pelos navegadores)
-        window.addEventListener('load', () => {
-            this.tryPlay();
-        });
-
-        // Ativa no primeiro clique/interação caso o autoplay seja bloqueado
-        const startAudio = () => {
-            if (!this.initialized) {
-                this.tryPlay();
-            }
-        };
-
-        document.addEventListener('click', startAudio, { once: true });
-        document.addEventListener('touchstart', startAudio, { once: true });
-        document.addEventListener('scroll', startAudio, { once: true });
-    }
-
-    async tryPlay() {
-        try {
-            // Tenta tocar ambos
-            await this.bgMusic.play();
-
-            // Pequeno delay para a voz entrar após a música
-            setTimeout(async () => {
-                try {
-                    await this.voiceAudio.play();
-                } catch (e) {
-                    console.warn('Voz bloqueada pelo navegador');
-                }
-            }, 1000);
-
-            this.initialized = true;
-            this.updateButtonState();
-            console.log('🎵 Áudio iniciado com sucesso');
-        } catch (error) {
-            console.log('🔇 Autoplay bloqueado. Aguardando interação do usuário...');
-        }
-    }
-
-    toggleAudio() {
-        if (this.isPaused) {
-            this.bgMusic.play();
-            // Só toca a voz novamente se ela não tiver terminado ou se quisermos reiniciar
-            // Por simplicidade, vamos apenas tocar/pausar o que estiver rodando
-            if (!this.voiceAudio.paused || this.voiceAudio.currentTime > 0) {
-                this.voiceAudio.play();
-            }
-            this.isPaused = false;
-        } else {
-            this.bgMusic.pause();
-            this.voiceAudio.pause();
-            this.isPaused = true;
-        }
-        this.updateButtonState();
-    }
-
-    updateButtonState() {
-        if (!this.controlBtn) return;
-
-        if (this.isPaused) {
-            this.controlBtn.classList.add('paused');
-            this.controlBtn.setAttribute('aria-label', 'Retomar áudio');
-        } else {
-            this.controlBtn.classList.remove('paused');
-            this.controlBtn.setAttribute('aria-label', 'Pausar áudio');
-        }
-    }
-}
-
-
 
 // ============================================
 // KEYBOARD NAVIGATION
@@ -773,7 +552,7 @@ document.addEventListener('keydown', (e) => {
             navMenu.classList.remove('active');
             navToggle.classList.remove('active');
             navToggle.setAttribute('aria-expanded', 'false');
-            document.body.style.overflow = '';
+            document.body.classList.remove('no-scroll');
         }
 
         // Fecha FAQ abertos
@@ -786,25 +565,6 @@ document.addEventListener('keydown', (e) => {
 });
 
 // ============================================
-// PERFORMANCE: PRELOAD CRITICAL RESOURCES
-// ============================================
-
-if ('requestIdleCallback' in window) {
-    requestIdleCallback(() => {
-        // Pré-carrega imagens importantes
-        const criticalImages = [
-            'images/hero-cuidado.jpg',
-            'images/sobre-equipe.jpg'
-        ];
-
-        criticalImages.forEach(src => {
-            const img = new Image();
-            img.src = src;
-        });
-    });
-}
-
-// ============================================
 // SERVICE WORKER (OPCIONAL - PWA)
 // ============================================
 
@@ -814,3 +574,113 @@ if ('serviceWorker' in navigator) {
         // navigator.serviceWorker.register('/sw.js');
     });
 }
+
+// ============================================
+// WHATSAPP PREMIUM
+// ============================================
+
+function initWaPremium() {
+    const bubble = document.getElementById('wa-message-bubble');
+    const typing = document.getElementById('wa-typing');
+    const realMessage = document.getElementById('wa-real-message');
+    const badge = document.getElementById('wa-notification');
+    const closeBtn = document.getElementById('wa-close-btn');
+    const mainBtn = document.getElementById('wa-main-btn');
+
+    if (!bubble || !typing || !realMessage || !badge || !closeBtn || !mainBtn) return;
+
+    // 1. Mostrar o balão após 20 segundos
+    setTimeout(() => {
+        bubble.classList.add('show');
+        
+        // 2. Simular digitação por 2.5 segundos antes de mostrar a mensagem
+        setTimeout(() => {
+            typing.style.display = 'none';
+            realMessage.style.display = 'block';
+        }, 2500);
+
+    }, 20000);
+
+    // Fechar balão
+    closeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        bubble.classList.remove('show');
+        // Mostrar notificação após fechar para manter engajamento
+        setTimeout(() => {
+            badge.classList.add('show');
+        }, 2000);
+    });
+
+    // Ao clicar no botão, remove tudo
+    mainBtn.addEventListener('click', () => {
+        bubble.classList.remove('show');
+        badge.classList.remove('show');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initWaPremium);
+
+// ============================================
+// CONTROLE DE ÁUDIO
+// ============================================
+
+function initAudioControl() {
+    const audioBtn = document.getElementById('audioControl');
+    if (!audioBtn) return;
+
+    const iconPlaying = audioBtn.querySelector('.audio-icon-playing');
+    const iconPaused = audioBtn.querySelector('.audio-icon-paused');
+
+    // Cria os elementos de áudio
+    const audioLocucao = new Audio('ElevenLabs_2026-03-07T01_35_03_Rachel_pre_sp100_s50_sb75_se0_b_m2.mp3');
+    const audioFundo = new Audio('alex-productions-upbeat-and-inspiring-corporate-web(chosic.com).mp3');
+    
+    audioLocucao.loop = true;
+    audioFundo.loop = true;
+    
+    // Configura volumes
+    audioLocucao.volume = 1.0;
+    audioFundo.volume = 0.12; // Trilha de fundo bem baixa e suave
+
+    // Tenta dar play automaticamente (bloqueado por padrão em navegadores modernos)
+    const startAudio = () => {
+        const playLocucao = audioLocucao.play();
+        const playFundo = audioFundo.play();
+
+        Promise.all([playLocucao, playFundo]).then(() => {
+            iconPlaying.style.display = 'block';
+            iconPaused.style.display = 'none';
+        }).catch(() => {
+            // Bloqueado: Mantém mudo
+            iconPlaying.style.display = 'none';
+            iconPaused.style.display = 'block';
+        });
+
+        document.removeEventListener('click', startAudio);
+        document.removeEventListener('scroll', startAudio);
+    };
+
+    // Inicia áudio ao primeiro sinal de interação do usuário
+    document.addEventListener('click', startAudio);
+    document.addEventListener('scroll', startAudio);
+
+    audioBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (audioLocucao.paused) {
+            audioLocucao.play();
+            audioFundo.play();
+            iconPlaying.style.display = 'block';
+            iconPaused.style.display = 'none';
+            audioBtn.setAttribute('aria-label', 'Pausar áudio');
+        } else {
+            audioLocucao.pause();
+            audioFundo.pause();
+            iconPlaying.style.display = 'none';
+            iconPaused.style.display = 'block';
+            audioBtn.setAttribute('aria-label', 'Iniciar áudio');
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', initAudioControl);
