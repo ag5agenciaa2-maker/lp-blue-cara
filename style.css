@@ -1406,10 +1406,12 @@ ol {
 }
 
 .testimonials-carousel {
-    display: flex;
+    display: inline-flex;
+    flex-wrap: nowrap;
+    white-space: nowrap;
     gap: var(--space-6);
     animation: scrollTestimonials 40s linear infinite;
-    width: max-content;
+    padding: var(--space-4) 0;
 }
 
 .testimonials-carousel:hover {
@@ -1441,6 +1443,7 @@ ol {
 .testimonials-carousel .testimonial-card {
     width: 360px;
     flex-shrink: 0;
+    white-space: normal;
     background: var(--color-gray-50);
     padding: var(--space-8);
     border-radius: var(--radius-2xl);
@@ -1451,6 +1454,12 @@ ol {
     background: var(--color-white);
     box-shadow: var(--shadow-xl);
     transform: translateY(-5px);
+}
+
+/* Garante que cards do carrossel não sejam afetados pelo sistema reveal */
+.testimonials-carousel .testimonial-card.reveal {
+    opacity: 1;
+    transform: none;
 }
 
 .testimonial-header {
@@ -1628,7 +1637,7 @@ ol {
 
 .cta-section {
     padding: var(--space-24) 0;
-    background: linear-gradient(135deg, var(--color-primary-dark) 0%, var(--color-primary) 100%);
+    background: var(--color-primary-dark);
     position: relative;
     overflow: hidden;
 }
@@ -1637,9 +1646,13 @@ ol {
     content: '';
     position: absolute;
     inset: 0;
-    background-image:
-        radial-gradient(circle at 20% 80%, rgba(255, 255, 255, 0.05) 0%, transparent 50%),
-        radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.03) 0%, transparent 40%);
+    background-image: 
+        linear-gradient(135deg, rgba(12, 17, 69, 0.92) 0%, rgba(34, 50, 137, 0.85) 100%),
+        url('images/servico-cuidado24h.webp');
+    background-size: cover;
+    background-position: center top;
+    background-attachment: fixed;
+    opacity: 0.5;
     pointer-events: none;
 }
 

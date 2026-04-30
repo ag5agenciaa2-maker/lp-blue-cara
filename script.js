@@ -231,7 +231,8 @@ class FAQAccordion {
 
 class ScrollReveal {
     constructor() {
-        this.elements = $$('.service-card, .diff-card, .testimonial-card, .pain-item, .solution-feature');
+        // Exclui .testimonial-card do carrossel (tem animação própria)
+        this.elements = $$('.service-card, .diff-card, .pain-item, .solution-feature, .testimonials-grid .testimonial-card');
         this.init();
     }
 
